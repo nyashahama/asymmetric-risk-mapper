@@ -3,6 +3,7 @@
 
 import { HeroSection } from "@/components/landing/HeroSection";
 import { SampleQuestions } from "@/components/landing/SampleQuestions";
+import { RankedOutput } from "@/components/landing/RankedOutput";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FooterSection } from "@/components/landing/FooterSection";
@@ -19,17 +20,30 @@ export default function LandingPage() {
       }}
     >
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Playfair+Display:ital,wght@0,700;0,900;1,400;1,700&display=swap');
+
+        :root {
+          --font-display: 'Playfair Display', Georgia, serif;
+          --font-mono:    'DM Mono', monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(0.85); }
+          0%, 100% { opacity: 1;   transform: scale(1);    }
+          50%       { opacity: 0.5; transform: scale(0.85); }
         }
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(16px); }
-          to   { opacity: 1; transform: translateY(0); }
+          to   { opacity: 1; transform: translateY(0);    }
+        }
+        @keyframes statusBlink {
+          0%, 100% { opacity: 1;   }
+          50%       { opacity: 0.3; }
         }
       `}</style>
 
-      {/* Nav */}
+      {/* ── Nav ── */}
       <nav
         style={{
           position: "fixed",
@@ -62,6 +76,8 @@ export default function LandingPage() {
               height: 6,
               borderRadius: "50%",
               background: "#ef4444",
+              boxShadow: "0 0 6px #ef4444",
+              animation: "statusBlink 2.5s ease-in-out infinite",
             }}
           />
           ASYMMETRIC RISK MAPPER
@@ -73,7 +89,7 @@ export default function LandingPage() {
               key={item}
               href="#"
               style={{
-                fontFamily: "var(--font-mono)",
+                fontFamily: "'DM Mono', monospace",
                 fontSize: 12,
                 color: "#64748b",
                 textDecoration: "none",
@@ -108,10 +124,11 @@ export default function LandingPage() {
         </a>
       </nav>
 
-      {/* Page sections */}
+      {/* ── Sections ── */}
       <div style={{ paddingTop: 64 }}>
         <HeroSection />
         <SampleQuestions />
+        <RankedOutput />
         <HowItWorks />
         <PricingSection />
       </div>
