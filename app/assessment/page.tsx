@@ -1,8 +1,12 @@
 "use client";
-import { useState, useCallback } from "react";
+
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { SECTIONS, ALL_QUESTIONS, Answers, TOTAL_QUESTIONS } from "@/lib/risks";
+import { useGetQuestions } from "@/hooks/useGetQuestions";
+import { useUpsertAnswers } from "@/hooks/useUpsertAnswers";
+import { sessionsService } from "@/api/services/sessionsService";
+import { Question } from "@/api/services/questionsService";
 import { ProgressBar } from "@/components/assessment/ProgressBar";
 import { SectionHeader } from "@/components/assessment/SectionHeader";
 import { RadioOptions } from "@/components/assessment/RadioOptions";
@@ -11,46 +15,262 @@ import { NavButtons } from "@/components/assessment/NavButtons";
 
 const ESTIMATED_MINUTES = 12;
 
+// ─── Section metadata ─────────────────────────────────────────────────────────
+const SECTION_META: Record<string, { icon: string; subtitle: string }> = {
+  snapshot: {
+    icon: "◎",
+    subtitle:
+      "Context so we can calibrate what 'existential' actually means for you.",
+  },
+  dependency: {
+    icon: "⬡",
+    subtitle:
+      "These questions surface concentration risk — the things that could vanish and take you with them.",
+  },
+  market: {
+    icon: "△",
+    subtitle:
+      "Strategic vulnerabilities — the things that could make your business model obsolete.",
+  },
+  operational: {
+    icon: "▣",
+    subtitle:
+      "Slow-burning threats. These rarely announce themselves — they compound quietly until they don't.",
+  },
+  blindspots: {
+    icon: "◈",
+    subtitle:
+      "These are the uncomfortable ones. They're designed to surface risks you didn't know you had.",
+  },
+};
+
 export default function AssessmentPage() {
   const router = useRouter();
-  const [answers, setAnswers] = useState<Answers>({});
+
+  // ── Session identity ────────────────────────────────────────────────────────
+  const [sessionID, setSessionID] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState(false);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        let id = localStorage.getItem("session_id");
+
+        if (!id) {
+          // No session created yet (user navigated directly) — create one now
+          const { session_id, anon_token } =
+            await sessionsService.createSession({});
+          localStorage.setItem("session_id", session_id);
+          localStorage.setItem("anon_token", anon_token);
+          id = session_id;
+        }
+
+        setSessionID(id);
+      } catch (err) {
+        console.error("Failed to initialise session:", err);
+        setSessionError(true);
+      }
+    };
+
+    init();
+  }, []);
+
+  // ── Data fetching ───────────────────────────────────────────────────────────
+  const {
+    data,
+    answers,
+    totalAnswered,
+    loading,
+    error,
+    setAnswer,
+    buildAnswerPayload,
+  } = useGetQuestions(sessionID);
+
+  const { upsertAnswers, loading: saving } = useUpsertAnswers(sessionID ?? "");
+
+  // ── Navigation state ────────────────────────────────────────────────────────
   const [globalIdx, setGlobalIdx] = useState(0);
+  const lastPersistedSectionRef = useRef<string | null>(null);
 
-  const question = ALL_QUESTIONS[globalIdx];
-  const currentAnswer = answers[question?.id] ?? "";
+  const allQuestions: Question[] = data?.questions ?? [];
+  const totalQuestions = allQuestions.length;
+  const question = allQuestions[globalIdx] ?? null;
+  const currentAnswer = question ? (answers[question.id] ?? "") : "";
 
-  const sectionIdx = SECTIONS.findIndex((s) => s.id === question?.sectionId);
-  const section = SECTIONS[sectionIdx];
-  const prevSectionIdx =
-    globalIdx > 0
-      ? SECTIONS.findIndex(
-          (s) => s.id === ALL_QUESTIONS[globalIdx - 1]?.sectionId,
-        )
-      : -1;
-  const isSectionStart = sectionIdx !== prevSectionIdx;
+  // ── Section transition detection ────────────────────────────────────────────
+  const prevSectionID =
+    globalIdx > 0 ? allQuestions[globalIdx - 1]?.section_id : null;
+  const isSectionStart = question && question.section_id !== prevSectionID;
 
-  const isLastQ = globalIdx === ALL_QUESTIONS.length - 1;
+  const sections = data
+    ? Array.from(
+        new Map(data.questions.map((q) => [q.section_id, q.section_title])),
+      )
+    : [];
+  const sectionIdx = sections.findIndex(([id]) => id === question?.section_id);
+
+  // ── Persist helpers ─────────────────────────────────────────────────────────
+  const persistCurrentSection = useCallback(async () => {
+    if (!data || !question) return;
+    const sectionQuestions = data.questions.filter(
+      (q) => q.section_id === question.section_id,
+    );
+    const payload = buildAnswerPayload(sectionQuestions);
+    const nonEmpty = payload.filter((a) => a.answer_text.trim().length > 0);
+    if (nonEmpty.length === 0) return;
+    try {
+      await upsertAnswers({ answers: nonEmpty });
+      lastPersistedSectionRef.current = question.section_id;
+    } catch {
+      // Non-fatal — answers are still in local state
+    }
+  }, [data, question, buildAnswerPayload, upsertAnswers]);
+
+  // ── Navigation ──────────────────────────────────────────────────────────────
+  const isLastQ = globalIdx === totalQuestions - 1;
   const canAdvance = !question?.required || currentAnswer.trim().length > 0;
 
-  const handleAnswer = useCallback(
-    (val: string) => setAnswers((prev) => ({ ...prev, [question.id]: val })),
-    [question?.id],
-  );
+  const handleNext = async () => {
+    const nextSectionID = allQuestions[globalIdx + 1]?.section_id;
+    const isCrossingSectionBoundary =
+      nextSectionID && nextSectionID !== question?.section_id;
 
-  const handleNext = () => {
+    if (isCrossingSectionBoundary || isLastQ) {
+      await persistCurrentSection();
+    }
+
     if (isLastQ) {
-      sessionStorage.setItem("rm_answers", JSON.stringify(answers));
       router.push("/preview");
     } else {
       setGlobalIdx((i) => i + 1);
     }
   };
 
-  const handlePrev = () => {
-    if (globalIdx > 0) setGlobalIdx((i) => i - 1);
+  const handlePrev = async () => {
+    if (globalIdx === 0) return;
+    const prevSectionID2 = allQuestions[globalIdx - 1]?.section_id;
+    const isCrossingSectionBoundary =
+      prevSectionID2 && prevSectionID2 !== question?.section_id;
+    if (isCrossingSectionBoundary) {
+      await persistCurrentSection();
+    }
+    setGlobalIdx((i) => i - 1);
   };
 
+  // ── Loading / error states ──────────────────────────────────────────────────
+  if (sessionError) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 16,
+          padding: 24,
+        }}
+      >
+        <p
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            color: "var(--red)",
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+          }}
+        >
+          Failed to start session
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            padding: "10px 24px",
+            border: "1.5px solid var(--ink)",
+            borderRadius: 2,
+            background: "var(--ink)",
+            color: "var(--paper)",
+            cursor: "pointer",
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!sessionID || loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+          color: "rgba(14,14,14,0.35)",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+        }}
+      >
+        Loading assessment...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 16,
+          padding: 24,
+        }}
+      >
+        <p
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            color: "var(--red)",
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+          }}
+        >
+          Failed to load questions
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            padding: "10px 24px",
+            border: "1.5px solid var(--ink)",
+            borderRadius: 2,
+            background: "var(--ink)",
+            color: "var(--paper)",
+            cursor: "pointer",
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   if (!question) return null;
+
+  const meta = SECTION_META[question.section_id] ?? { icon: "◆", subtitle: "" };
 
   return (
     <div style={{ position: "relative", zIndex: 1, minHeight: "100vh" }}>
@@ -104,15 +324,16 @@ export default function AssessmentPage() {
       <main
         style={{ maxWidth: 680, margin: "0 auto", padding: "48px 24px 100px" }}
       >
-        <ProgressBar current={globalIdx + 1} total={TOTAL_QUESTIONS} />
+        <ProgressBar current={globalIdx + 1} total={totalQuestions} />
 
-        {isSectionStart && section && (
+        {isSectionStart && (
           <SectionHeader
-            key={`sh-${sectionIdx}`}
+            key={`sh-${question.section_id}`}
             sectionIdx={sectionIdx}
-            title={section.title}
-            icon={section.icon}
-            subtitle={section.subtitle}
+            title={question.section_title}
+            icon={meta.icon}
+            subtitle={meta.subtitle}
+            totalSections={sections.length}
           />
         )}
 
@@ -145,18 +366,18 @@ export default function AssessmentPage() {
           )}
 
           {(question.type === "radio" || question.type === "select") &&
-            question.opts && (
+            question.options && (
               <RadioOptions
-                opts={question.opts}
+                options={question.options}
                 value={currentAnswer}
-                onChange={handleAnswer}
+                onChange={(val) => setAnswer(question.id, val)}
               />
             )}
 
           {question.type === "text" && (
             <TextInput
               value={currentAnswer}
-              onChange={handleAnswer}
+              onChange={(val) => setAnswer(question.id, val)}
               placeholder={question.placeholder}
             />
           )}
@@ -181,6 +402,7 @@ export default function AssessmentPage() {
           globalIdx={globalIdx}
           isLastQ={isLastQ}
           canAdvance={canAdvance}
+          isSaving={saving}
           isOptionalEmpty={!question.required && currentAnswer === ""}
           onPrev={handlePrev}
           onNext={handleNext}
