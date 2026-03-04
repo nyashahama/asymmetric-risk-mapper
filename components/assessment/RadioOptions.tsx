@@ -1,18 +1,23 @@
-interface Props {
-  opts: string[];
+// ─── RadioOptions.tsx ─────────────────────────────────────────────────────────
+// Updated to use the API's QuestionOption shape instead of string[].
+
+import { QuestionOption } from "@/api/services/questionsService";
+
+interface RadioOptionsProps {
+  options: QuestionOption[];
   value: string;
   onChange: (v: string) => void;
 }
 
-export function RadioOptions({ opts, value, onChange }: Props) {
+export function RadioOptions({ options, value, onChange }: RadioOptionsProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {opts.map((opt) => {
-        const sel = value === opt;
+      {options.map((opt) => {
+        const sel = value === opt.label;
         return (
           <button
-            key={opt}
-            onClick={() => onChange(opt)}
+            key={opt.label}
+            onClick={() => onChange(opt.label)}
             style={{
               textAlign: "left",
               padding: "13px 16px",
@@ -54,7 +59,7 @@ export function RadioOptions({ opts, value, onChange }: Props) {
                 />
               )}
             </span>
-            {opt}
+            {opt.label}
           </button>
         );
       })}
