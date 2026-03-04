@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loadStripe } from "@stripe/stripe-js";
@@ -11,7 +11,7 @@ const stripePromise = loadStripe(
 
 type PaymentStatus = "loading" | "succeeded" | "processing" | "failed";
 
-export default function CheckoutCompletePage() {
+function CheckoutCompleteContent() {
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<PaymentStatus>("loading");
   const [email, setEmail] = useState<string>("");
@@ -55,8 +55,6 @@ export default function CheckoutCompletePage() {
 
     checkStatus();
   }, [searchParams]);
-
-  console.log("email: ", email);
 
   return (
     <div style={{ position: "relative", zIndex: 1, minHeight: "100vh" }}>
@@ -377,5 +375,30 @@ export default function CheckoutCompletePage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function CheckoutCompletePage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: "100vh",
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            color: "rgba(14,14,14,0.4)",
+            letterSpacing: "0.1em",
+          }}
+        >
+          Confirming payment...
+        </div>
+      }
+    >
+      <CheckoutCompleteContent />
+    </Suspense>
   );
 }
