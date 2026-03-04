@@ -6,7 +6,7 @@ import { BlurredRiskRow } from "@/components/preview/BlurredRiskRow";
 import { PaywallOverlay } from "@/components/preview/PaywallOverlay";
 
 export default function PreviewPage() {
-  const { risks, loaded } = usePreviewData();
+  const { risks, sessionID, loaded, error } = usePreviewData();
 
   if (!loaded) {
     return (
@@ -23,6 +23,45 @@ export default function PreviewPage() {
         }}
       >
         Analysing your risks...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+          gap: 16,
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+          color: "var(--red)",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+        }}
+      >
+        <span>Failed to load your results</span>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            padding: "10px 24px",
+            border: "1.5px solid var(--ink)",
+            borderRadius: 2,
+            background: "var(--ink)",
+            color: "var(--paper)",
+            cursor: "pointer",
+          }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -202,6 +241,7 @@ export default function PreviewPage() {
               <BlurredRiskRow key={risk.id} risk={risk} idx={i} />
             ))}
             <PaywallOverlay
+              sessionID={sessionID}
               onUnlock={() => {}}
               criticalCount={criticalRisks.length}
               topRiskName={topRisk?.name ?? ""}
