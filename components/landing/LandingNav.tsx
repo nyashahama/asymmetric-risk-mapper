@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { StartButton } from "@/components/landing/StartButton";
 
 export function LandingNav() {
   return (
@@ -35,22 +35,14 @@ export function LandingNav() {
         >
           $59 · One-time
         </span>
-        <Link
-          href="/assessment"
+        <StartButton
+          label="Start Free →"
           style={{
-            fontFamily: "var(--font-mono)",
             fontSize: 10,
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
             padding: "9px 20px",
-            background: "var(--ink)",
-            color: "var(--paper)",
-            textDecoration: "none",
-            borderRadius: 2,
+            boxShadow: "none",
           }}
-        >
-          Start Free →
-        </Link>
+        />
       </div>
     </nav>
   );
