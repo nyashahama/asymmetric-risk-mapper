@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { TOTAL_QUESTIONS, ESTIMATED_MINUTES } from "@/lib/risks";
 import { RISK_EXAMPLES } from "@/lib/landingData";
+import { StartButton } from "@/components/landing/StartButton";
 
 export function HeroSection() {
   return (
@@ -56,26 +56,7 @@ export function HeroSection() {
             flexWrap: "wrap",
           }}
         >
-          <Link
-            href="/assessment"
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 11,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              padding: "14px 32px",
-              background: "var(--ink)",
-              color: "var(--paper)",
-              textDecoration: "none",
-              borderRadius: 2,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              boxShadow: "4px 4px 0 rgba(14,14,14,0.15)",
-            }}
-          >
-            Start the Assessment — Free →
-          </Link>
+          <StartButton label="Start the Assessment — Free →" />
           <span
             style={{
               fontFamily: "var(--font-mono)",
