@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { WHAT_YOU_GET } from "@/lib/landingData";
+import { StartButton } from "@/components/landing/StartButton";
 
 export function PricingSection() {
   return (
@@ -50,24 +50,14 @@ export function PricingSection() {
             report — after you&apos;ve already seen the heat map preview and
             decided it&apos;s worth it.
           </p>
-          <Link
-            href="/assessment"
+          <StartButton
+            label="Start the Assessment — Free →"
             style={{
               display: "inline-flex",
-              fontFamily: "var(--font-mono)",
               fontSize: 11,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
               padding: "13px 28px",
-              background: "var(--ink)",
-              color: "var(--paper)",
-              textDecoration: "none",
-              borderRadius: 2,
-              boxShadow: "4px 4px 0 rgba(14,14,14,0.15)",
             }}
-          >
-            Start the Assessment — Free →
-          </Link>
+          />
         </div>
 
         {/* Right: feature list */}
