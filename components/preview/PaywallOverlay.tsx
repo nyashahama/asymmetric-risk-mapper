@@ -1,4 +1,7 @@
+"use client";
+
 import { useState } from "react";
+import { checkoutService } from "@/api/services/checkoutService";
 
 const FEATURES = [
   "Full risk register with specific hedge actions",
@@ -10,25 +13,46 @@ const FEATURES = [
 interface Props {
   criticalCount: number;
   topRiskName: string;
+  sessionID: string | null;
   onUnlock: () => void;
 }
 
 export function PaywallOverlay({
   criticalCount,
   topRiskName,
+  sessionID,
   onUnlock,
 }: Props) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  const isValidEmail = email.includes("@") && email.includes(".");
 
   const handlePay = async () => {
-    if (!email || !email.includes("@")) return;
+    if (!isValidEmail || !sessionID || loading) return;
+
     setLoading(true);
-    // In production: call your Go backend → create Stripe session
-    await new Promise((r) => setTimeout(r, 1200));
-    sessionStorage.setItem("rm_email", email);
-    sessionStorage.setItem("rm_paid", "true");
-    window.location.href = "/report";
+    setCheckoutError(null);
+
+    try {
+      const { client_secret } = await checkoutService.createCheckout(
+        sessionID,
+        { email },
+      );
+
+      // Store the email so the confirmation page can reference it
+      localStorage.setItem("checkout_email", email);
+      // Store the client_secret for Stripe.js on the checkout page
+      localStorage.setItem("stripe_client_secret", client_secret);
+
+      // Navigate to the Stripe payment step
+      window.location.href = "/checkout";
+    } catch (err) {
+      console.error("PaywallOverlay: checkout error", err);
+      setCheckoutError("Something went wrong. Please try again.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -185,13 +209,16 @@ export function PaywallOverlay({
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setCheckoutError(null);
+                }}
                 placeholder="you@company.com"
                 style={{
                   width: "100%",
                   padding: "10px 12px",
                   background: "rgba(244,240,232,0.08)",
-                  border: "1.5px solid rgba(244,240,232,0.15)",
+                  border: `1.5px solid ${checkoutError ? "var(--red)" : "rgba(244,240,232,0.15)"}`,
                   borderRadius: 2,
                   color: "var(--paper)",
                   fontFamily: "var(--font-sans)",
@@ -203,23 +230,47 @@ export function PaywallOverlay({
                   (e.target.style.borderColor = "rgba(244,240,232,0.4)")
                 }
                 onBlur={(e) =>
-                  (e.target.style.borderColor = "rgba(244,240,232,0.15)")
+                  (e.target.style.borderColor = checkoutError
+                    ? "var(--red)"
+                    : "rgba(244,240,232,0.15)")
                 }
                 onKeyDown={(e) => e.key === "Enter" && handlePay()}
               />
+              {checkoutError && (
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 9,
+                    color: "var(--red)",
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  {checkoutError}
+                </div>
+              )}
             </div>
 
             <button
               onClick={handlePay}
-              disabled={loading || !email.includes("@")}
+              disabled={loading || !isValidEmail || !sessionID}
               style={{
                 width: "100%",
                 padding: "13px",
-                background: loading ? "rgba(244,240,232,0.15)" : "var(--paper)",
-                color: loading ? "rgba(244,240,232,0.4)" : "var(--ink)",
+                background:
+                  loading || !isValidEmail
+                    ? "rgba(244,240,232,0.15)"
+                    : "var(--paper)",
+                color:
+                  loading || !isValidEmail
+                    ? "rgba(244,240,232,0.4)"
+                    : "var(--ink)",
                 border: "none",
                 borderRadius: 2,
-                cursor: loading ? "wait" : "pointer",
+                cursor:
+                  loading || !isValidEmail || !sessionID
+                    ? "not-allowed"
+                    : "pointer",
                 fontFamily: "var(--font-mono)",
                 fontSize: 11,
                 letterSpacing: "0.12em",
@@ -228,7 +279,7 @@ export function PaywallOverlay({
                 marginBottom: 10,
               }}
             >
-              {loading ? "Processing..." : "Unlock Full Report →"}
+              {loading ? "Creating payment..." : "Unlock Full Report →"}
             </button>
 
             <div
@@ -240,7 +291,7 @@ export function PaywallOverlay({
                 lineHeight: 1.5,
               }}
             >
-              Powered by Stripe · Secure · Account created automatically
+              Powered by Stripe · Secure · No account needed
             </div>
           </div>
         </div>
