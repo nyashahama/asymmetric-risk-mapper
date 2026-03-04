@@ -1,13 +1,18 @@
-import { SECTIONS } from "@/lib/risks";
-
-interface Props {
+interface SectionHeaderProps {
   sectionIdx: number;
+  totalSections: number;
   title: string;
   icon: string;
   subtitle: string;
 }
 
-export function SectionHeader({ sectionIdx, title, icon, subtitle }: Props) {
+export function SectionHeader({
+  sectionIdx,
+  totalSections,
+  title,
+  icon,
+  subtitle,
+}: SectionHeaderProps) {
   return (
     <div className="fade-up" style={{ marginBottom: 32 }}>
       <div
@@ -45,7 +50,7 @@ export function SectionHeader({ sectionIdx, title, icon, subtitle }: Props) {
               marginBottom: 2,
             }}
           >
-            Section {sectionIdx + 1} of {SECTIONS.length}
+            Section {sectionIdx + 1} of {totalSections}
           </div>
           <div style={{ fontFamily: "var(--font-serif)", fontSize: "1.15rem" }}>
             {title}
